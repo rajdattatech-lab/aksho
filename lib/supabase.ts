@@ -13,11 +13,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// True ONLY during Node SSR (Vercel's static export pre-render).
+//   - Browser:        has window           → false
+//   - React Native:   no process.versions.node → false
+//   - Vercel SSR:     no window, has process.versions.node → true
+//
+// During SSR we disable session persistence + auto-refresh because they
+// trigger storage reads inside Supabase's GoTrueClient init flow that
+// cannot be intercepted by the storage adapter alone. Session restores
+// when the client hydrates in the browser.
+const isNodeSSR =
+  typeof window === 'undefined' &&
+  typeof process !== 'undefined' &&
+  typeof process.versions !== 'undefined' &&
+  typeof process.versions.node === 'string';
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage,
-    autoRefreshToken: true,
-    persistSession: true,
+    autoRefreshToken: !isNodeSSR,
+    persistSession: !isNodeSSR,
     detectSessionInUrl: false,
   },
 });
